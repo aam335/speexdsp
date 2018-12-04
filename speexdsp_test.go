@@ -21,6 +21,12 @@ func bToKb(b uint64) uint64 {
 	return b / 1024
 }
 
+const (
+	inLenGen = 960
+	stereo   = 2
+	mono     = 1
+)
+
 func TestInit(t *testing.T) {
 	// x := [](*Resampler){}
 	// cnt := 200
@@ -92,12 +98,12 @@ func makeSinePcm(samples, channels int) []int16 {
 
 func TestProcessInt(t *testing.T) {
 	fromBase := int(48000)
-	inLen := 200
-	channels := 1
-	pcm := makeSinePcm(inLen, channels)
-	for i := 0.5; i < 2; i += .1 {
+	// inLen := 960
+	// channels := 1
+	pcm := makeSinePcm(inLenGen, mono)
+	for i := 0.1; i < 2; i += .05 {
 		toBase := int(float64(fromBase) * i)
-		r, err := ResamplerInit(channels, fromBase, toBase, QualityDefault)
+		r, err := ResamplerInit(mono, fromBase, toBase, QualityDefault)
 		if err != nil {
 			t.Error(err)
 		}
@@ -106,28 +112,29 @@ func TestProcessInt(t *testing.T) {
 		steps := 0
 		// speexdsp is used as "Black Box", we dont know all situations, when
 		// resampler returns earlier, than input ends
-		for pos < len(pcm) {
-			readed, resPcm, err := r.PocessInt(1, pcm[pos:])
-			if err != nil {
-				t.Error(err)
+		for q := 1; q < 100; q++ {
+			for pos < len(pcm) {
+				readed, resPcm, err := r.PocessInt(1, pcm[pos:])
+				if err != nil {
+					t.Error(err)
+				}
+				out += len(resPcm)
+				pos += readed
+				steps++
 			}
-			out += len(resPcm)
-			pos += readed
-			steps++
+			if math.Abs(float64(out)/float64(len(pcm))-i) > 1e-5 {
+				t.Error(i, steps, inLenGen, out)
+			}
 		}
-		if math.Abs(float64(out)/float64(len(pcm))-i) > 1e-5 {
-			t.Error(i, steps, inLen, out)
-		}
-
 	}
 }
 
 func TestProcessIntInterleaved(t *testing.T) {
 	fromBase := int(48000)
-	inLen := 200
-	channels := 2
+	inLen := inLenGen
+	channels := stereo
 	pcm := makeSinePcm(inLen, channels)
-	for i := 0.5; i < 2; i += .1 {
+	for i := 0.1; i < 2; i += .05 {
 		toBase := int(float64(fromBase) * i)
 		r, err := ResamplerInit(channels, fromBase, toBase, QualityDefault)
 		if err != nil {
@@ -171,10 +178,10 @@ func makeSinePcmFloat32(samples, channels int) []float32 {
 }
 func TestProcessFloat32(t *testing.T) {
 	fromBase := int(48000)
-	inLen := 200
-	channels := 1
+	inLen := inLenGen
+	channels := mono
 	pcm := makeSinePcmFloat32(inLen, channels)
-	for i := 0.5; i < 2; i += .1 {
+	for i := 0.5; i < 2; i += .01 {
 		toBase := int(float64(fromBase) * i)
 		r, err := ResamplerInit(channels, fromBase, toBase, QualityDefault)
 		if err != nil {
@@ -231,4 +238,9 @@ func TestProcessFloatInterleaved(t *testing.T) {
 		}
 
 	}
+}
+
+func TestTTT(t *testing.T) {
+	shit()
+
 }
