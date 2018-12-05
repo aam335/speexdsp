@@ -1,25 +1,9 @@
 package speexdsp
 
 import (
-	"log"
 	"math"
-	"runtime"
 	"testing"
 )
-
-func PrintMemUsage() {
-	var m runtime.MemStats
-	runtime.ReadMemStats(&m)
-	// For info on each, see: https://golang.org/pkg/runtime/#MemStats
-	log.Print("Alloc = ", bToKb(m.Alloc), " TotalAlloc = ", bToKb(m.TotalAlloc), " Sys = ", bToKb(m.Sys), " NumGC = ", m.NumGC)
-}
-
-func bToMb(b uint64) uint64 {
-	return b / 1024 / 1024
-}
-func bToKb(b uint64) uint64 {
-	return b / 1024
-}
 
 const (
 	inLenGen = 960
@@ -28,33 +12,16 @@ const (
 )
 
 func TestInit(t *testing.T) {
-	// x := [](*Resampler){}
-	// cnt := 200
-	inLen, channels := 960, 2
+	inLen, channels := inLenGen, 2
 	pcm := makeSinePcm(inLen, channels)
-	//runtime.GC()
-	// for i := 0; i < cnt; i++ {
-	//	PrintMemUsage()
-	r, err := ResamplerInit(2, 48000, 44100, 4)
-	// x = append(x, r)
+	r, err := ResamplerInit(2, 48000, 48000, 4)
 	if err != nil {
 		t.Error(err)
 	}
-	// PrintMemUsage()
-	//	PrintMemUsage()
-	// log.Print(i, unsafe.Pointer(r.resampler))
-	// }
-	// log.Print(len(x))
-	/*
-		for i, r := range x {
-			log.Print(i, unsafe.Pointer(r.resampler))
-			//_, _, _ :=
-		r.PocessIntInterleaved(pcm)
-			// rpcm = nil
-		}
-	*/
 	for i := 0; i < 1000; i++ {
-		r.PocessIntInterleaved(pcm)
+		if _, _, err := r.PocessIntInterleaved(pcm); err != nil {
+			t.Error(err)
+		}
 	}
 }
 func TestError(t *testing.T) {
@@ -98,10 +65,15 @@ func makeSinePcm(samples, channels int) []int16 {
 
 func TestProcessInt(t *testing.T) {
 	fromBase := int(48000)
-	// inLen := 960
-	// channels := 1
 	pcm := makeSinePcm(inLenGen, mono)
-	for i := 0.1; i < 2; i += .05 {
+	r, err := ResamplerInit(mono, fromBase, fromBase, QualityDefault)
+	if err != nil {
+		t.Error(err)
+	}
+	if _, _, err := r.PocessInt(1, pcm); err == nil {
+		t.Error("PocessInt returns noerr on errored channel")
+	}
+	for i := 0.1; i < 2; i += .01 {
 		toBase := int(float64(fromBase) * i)
 		r, err := ResamplerInit(mono, fromBase, toBase, QualityDefault)
 		if err != nil {
@@ -114,15 +86,16 @@ func TestProcessInt(t *testing.T) {
 		// resampler returns earlier, than input ends
 		for q := 1; q < 100; q++ {
 			for pos < len(pcm) {
-				readed, resPcm, err := r.PocessInt(1, pcm[pos:])
+				readed, resPcm, err := r.PocessInt(0, pcm[pos:])
 				if err != nil {
 					t.Error(err)
+					break
 				}
 				out += len(resPcm)
 				pos += readed
 				steps++
 			}
-			if math.Abs(float64(out)/float64(len(pcm))-i) > 1e-5 {
+			if math.Abs(float64(out)/float64(len(pcm))-i) > 1e-2 {
 				t.Error(i, steps, inLenGen, out)
 			}
 		}
@@ -134,9 +107,14 @@ func TestProcessIntInterleaved(t *testing.T) {
 	inLen := inLenGen
 	channels := stereo
 	pcm := makeSinePcm(inLen, channels)
-	for i := 0.1; i < 2; i += .05 {
+	var r *Resampler
+	var err error
+	var x [](*Resampler)
+loop:
+	for i := 0.1; i < 2; i += .01 {
 		toBase := int(float64(fromBase) * i)
-		r, err := ResamplerInit(channels, fromBase, toBase, QualityDefault)
+		r, err = ResamplerInit(channels, fromBase, toBase, QualityDefault)
+		x = append(x, r)
 		if err != nil {
 			t.Error(err)
 		}
@@ -149,13 +127,15 @@ func TestProcessIntInterleaved(t *testing.T) {
 			readed, resPcm, err := r.PocessIntInterleaved(pcm[pos:])
 			if err != nil {
 				t.Error(err)
+				break loop
 			}
 			out += len(resPcm)
 			pos += readed
 			steps++
 		}
-		if math.Abs(float64(out)/float64(len(pcm))-i) > 1e-5 {
+		if math.Abs(float64(out)/float64(len(pcm))-i) > 1e-2 {
 			t.Error(i, steps, inLen, out)
+			break loop
 		}
 
 	}
@@ -176,14 +156,23 @@ func makeSinePcmFloat32(samples, channels int) []float32 {
 	}
 	return pcm
 }
-func TestProcessFloat32(t *testing.T) {
+func TestProcessFloat(t *testing.T) {
 	fromBase := int(48000)
 	inLen := inLenGen
 	channels := mono
 	pcm := makeSinePcmFloat32(inLen, channels)
+
+	var r *Resampler
+	var err error
+
+	r, err = ResamplerInit(channels, fromBase, fromBase, QualityDefault)
+	if _, _, err := r.PocessFloat(1, pcm); err == nil {
+		t.Error("PocessFloat returns noerr on errored channel")
+	}
+
 	for i := 0.5; i < 2; i += .01 {
 		toBase := int(float64(fromBase) * i)
-		r, err := ResamplerInit(channels, fromBase, toBase, QualityDefault)
+		r, err = ResamplerInit(channels, fromBase, toBase, QualityDefault)
 		if err != nil {
 			t.Error(err)
 		}
@@ -193,27 +182,28 @@ func TestProcessFloat32(t *testing.T) {
 		// speexdsp is used as "Black Box", we dont know all situations, when
 		// resampler returns earlier, than input ends
 		for pos < len(pcm) {
-			readed, resPcm, err := r.PocessFloat(1, pcm[pos:])
+			readed, resPcm, err := r.PocessFloat(0, pcm[pos:])
 			if err != nil {
 				t.Error(err)
+				break
 			}
 			out += len(resPcm)
 			pos += readed
 			steps++
 		}
-		if math.Abs(float64(out)/float64(len(pcm))-i) > 1e-5 {
-			t.Error(i, steps, inLen, out)
+		if math.Abs(float64(out)/float64(len(pcm))-i) > 0.1 {
+			t.Error(i, steps, inLen, out, float64(toBase)/float64(fromBase), float64(out)/float64(len(pcm)))
 		}
-
 	}
 }
 
 func TestProcessFloatInterleaved(t *testing.T) {
 	fromBase := int(48000)
-	inLen := 200
+	inLen := inLenGen
 	channels := 2
 	pcm := makeSinePcmFloat32(inLen, channels)
-	for i := 0.5; i < 2; i += .1 {
+loop:
+	for i := 0.1; i < 2; i += .01 {
 		toBase := int(float64(fromBase) * i)
 		r, err := ResamplerInit(channels, fromBase, toBase, QualityDefault)
 		if err != nil {
@@ -228,19 +218,16 @@ func TestProcessFloatInterleaved(t *testing.T) {
 			readed, resPcm, err := r.PocessFloatInterleaved(pcm[pos:])
 			if err != nil {
 				t.Error(err)
+				break loop
 			}
 			out += len(resPcm)
 			pos += readed
 			steps++
 		}
-		if math.Abs(float64(out)/float64(len(pcm))-i) > 1e-5 {
+		if math.Abs(float64(out)/float64(len(pcm))-i) > 1e-2 {
 			t.Error(i, steps, inLen, out)
+			break loop
 		}
 
 	}
-}
-
-func TestTTT(t *testing.T) {
-	shit()
-
 }
