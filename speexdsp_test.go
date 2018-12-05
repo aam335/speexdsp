@@ -23,6 +23,7 @@ func TestInit(t *testing.T) {
 			t.Error(err)
 		}
 	}
+	r.Destroy()
 }
 func TestError(t *testing.T) {
 	errors := []string{
