@@ -2,10 +2,10 @@
 `speexdsp` is a Golang bindings for libspeexdsp, provides PCM sample rate converter for PCM coding
 
 ### Installation 
-
+```
 sudo apt-get install libspeexdsp-dev
 go get -v github.com/aam335/speexdsp
-
+```
 ### Examples
 ```go
 ...
