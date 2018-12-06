@@ -1,4 +1,4 @@
-## speexdsp
+## speexdsp lib PCM audio Resampler
 `speexdsp` is a Golang bindings for libspeexdsp, provides PCM sample rate converter for PCM coding
 
 ### Installation 
@@ -13,7 +13,7 @@ go get -v github.com/aam335/speexdsp
 	if err != nil {
 		t.Error(err)
 	}
-    for _,pcm: = range pcms { // pcms=[][]int16  
+    for _,pcm := range pcms { // pcms=[][]int16  
         // pcm =[]int16 
 		if readed, outpcm, err := r.PocessIntInterleaved(pcm); err != nil {
             t.Error(err)
@@ -24,4 +24,3 @@ go get -v github.com/aam335/speexdsp
 ...
 ```
 for more info see tests
-

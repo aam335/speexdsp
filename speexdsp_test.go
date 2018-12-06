@@ -74,12 +74,14 @@ func TestProcessInt(t *testing.T) {
 	if _, _, err := r.PocessInt(1, pcm); err == nil {
 		t.Error("PocessInt returns noerr on errored channel")
 	}
+	x := [](*Resampler){}
 	for i := 0.1; i < 2; i += .01 {
 		toBase := int(float64(fromBase) * i)
 		r, err := ResamplerInit(mono, fromBase, toBase, QualityDefault)
 		if err != nil {
 			t.Error(err)
 		}
+		x = append(x, r)
 		pos := 0
 		out := 0
 		steps := 0
@@ -101,6 +103,9 @@ func TestProcessInt(t *testing.T) {
 			}
 		}
 	}
+	for _, r := range x {
+		r.Destroy()
+	}
 }
 
 func TestProcessIntInterleaved(t *testing.T) {
@@ -115,10 +120,10 @@ loop:
 	for i := 0.1; i < 2; i += .01 {
 		toBase := int(float64(fromBase) * i)
 		r, err = ResamplerInit(channels, fromBase, toBase, QualityDefault)
-		x = append(x, r)
 		if err != nil {
 			t.Error(err)
 		}
+		x = append(x, r)
 		pos := 0
 		out := 0
 		steps := 0
@@ -139,6 +144,9 @@ loop:
 			break loop
 		}
 
+	}
+	for _, r := range x {
+		r.Destroy()
 	}
 }
 
@@ -170,13 +178,14 @@ func TestProcessFloat(t *testing.T) {
 	if _, _, err := r.PocessFloat(1, pcm); err == nil {
 		t.Error("PocessFloat returns noerr on errored channel")
 	}
-
+	x := [](*Resampler){}
 	for i := 0.5; i < 2; i += .01 {
 		toBase := int(float64(fromBase) * i)
 		r, err = ResamplerInit(channels, fromBase, toBase, QualityDefault)
 		if err != nil {
 			t.Error(err)
 		}
+		x = append(x, r)
 		pos := 0
 		out := 0
 		steps := 0
@@ -196,6 +205,9 @@ func TestProcessFloat(t *testing.T) {
 			t.Error(i, steps, inLen, out, float64(toBase)/float64(fromBase), float64(out)/float64(len(pcm)))
 		}
 	}
+	for _, r := range x {
+		r.Destroy()
+	}
 }
 
 func TestProcessFloatInterleaved(t *testing.T) {
@@ -203,6 +215,7 @@ func TestProcessFloatInterleaved(t *testing.T) {
 	inLen := inLenGen
 	channels := 2
 	pcm := makeSinePcmFloat32(inLen, channels)
+	x := [](*Resampler){}
 loop:
 	for i := 0.1; i < 2; i += .01 {
 		toBase := int(float64(fromBase) * i)
@@ -210,6 +223,7 @@ loop:
 		if err != nil {
 			t.Error(err)
 		}
+		x = append(x, r)
 		pos := 0
 		out := 0
 		steps := 0
@@ -231,4 +245,155 @@ loop:
 		}
 
 	}
+	for _, r := range x {
+		r.Destroy()
+	}
+}
+
+func TestFrac(t *testing.T) {
+	inLen, channels := inLenGen, 2
+	pcm := makeSinePcm(inLen, channels)
+	num, denum := 7, 11
+	r, err := ResamplerInitFrac(2, num, denum, 48000, 48000, 4)
+	if err != nil {
+		t.Error(err)
+	}
+	for i := 0; i < 10; i++ {
+		if _, _, err := r.PocessIntInterleaved(pcm); err != nil {
+			t.Error(err)
+		}
+	}
+	if num1, denum1, err := r.GetRatio(); err == nil {
+		if num != num1 || denum != denum1 {
+			t.Error("Ratio error")
+		}
+	} else {
+		t.Error(err)
+	}
+	newNum, newDenum := 17, 13
+	if err := r.SetRateFrac(newNum, newDenum, 48000, 48000); err != nil {
+		t.Error(err)
+	}
+
+	if num1, denum1, err := r.GetRatio(); err == nil {
+		if newNum != num1 || newDenum != denum1 {
+			t.Error("Ratio error")
+		}
+	} else {
+		t.Error(err)
+	}
+	r.Destroy()
+}
+
+func TestLatency(t *testing.T) {
+	inLen, channels := inLenGen, 2
+	pcm := makeSinePcm(inLen, channels)
+	inF, outF := 48000, 44100
+	r, err := ResamplerInit(2, inF, outF, 4)
+	if err != nil {
+		t.Error(err)
+	}
+	for i := 0; i < 10; i++ {
+		if _, _, err := r.PocessIntInterleaved(pcm); err != nil {
+			t.Error(err)
+		}
+	}
+	if latency, err := r.GetOutputLatency(); err != nil {
+		t.Error(err)
+	} else {
+		if latency == 0 {
+			t.Error("Latency error")
+		}
+	}
+	if latency, err := r.GetInputLatency(); err != nil {
+		t.Error(err)
+	} else {
+		if latency == 0 {
+			t.Error("Latency error")
+		}
+	}
+	r.Destroy()
+}
+
+func TestRate(t *testing.T) {
+	inLen, channels := inLenGen, 2
+	pcm := makeSinePcm(inLen, channels)
+	inF, outF := 48000, 44100
+	r, err := ResamplerInit(2, inF, outF, 4)
+	if err != nil {
+		t.Error(err)
+	}
+	for i := 0; i < 10; i++ {
+		if _, _, err := r.PocessIntInterleaved(pcm); err != nil {
+			t.Error(err)
+		}
+	}
+	if inF1, outF1, err := r.GetRate(); err == nil {
+		if inF != inF1 || outF != outF1 {
+			t.Error("Rate error")
+		}
+	} else {
+		t.Error(err)
+	}
+	inF, outF = outF, inF
+	if err := r.SetRate(inF, outF); err != nil {
+		t.Error(err)
+	}
+	if inF1, outF1, err := r.GetRate(); err == nil {
+		if inF != inF1 || outF != outF1 {
+			t.Error("Rate error")
+		}
+	} else {
+		t.Error(err)
+	}
+
+	r.Destroy()
+}
+
+func TestQuality(t *testing.T) {
+	inF, outF := 48000, 44100
+	r, err := ResamplerInit(2, inF, outF, 4)
+	if err != nil {
+		t.Error(err)
+	}
+
+	for i := QualityMin; i <= QualityMax; i++ {
+		if err := r.SetQuality(i); err != nil {
+			t.Error(err)
+			break
+		}
+	}
+	for _, i := range []int{QualityMin - 1, QualityMax + 1} {
+		if err := r.SetQuality(i); err == nil {
+			t.Error("SetQuality return noerr w/quality ", i)
+			break
+		}
+	}
+
+	r.Destroy()
+}
+
+func TestSkipZeros(t *testing.T) {
+	inF, outF := 48000, 44100
+	r, err := ResamplerInit(2, inF, outF, 4)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := r.SkipZeros(); err != nil {
+		t.Error(err)
+	}
+	r.Destroy()
+}
+
+func TestResetMem(t *testing.T) {
+	inF, outF := 48000, 44100
+	r, err := ResamplerInit(2, inF, outF, 4)
+	if err != nil {
+		t.Error(err)
+	}
+
+	if err := r.ResetMem(); err != nil {
+		t.Error(err)
+	}
+	r.Destroy()
 }
