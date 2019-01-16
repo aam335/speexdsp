@@ -2,6 +2,7 @@ package speexdsp
 
 /*
 #cgo pkg-config: speexdsp
+#include <stdint.h>
 #include <speex/speex_resampler.h>
 */
 import "C"
