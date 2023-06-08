@@ -127,7 +127,7 @@ func (r *Resampler) PocessIntInterleaved(in []int16) (int, []int16, error) {
 	if res != ErrorSuccess {
 		return 0, nil, StrError(ErrorInvalidArg)
 	}
-	return int(inLen) * r.channels, r.outBuff[:outLen*2], nil
+	return int(inLen) * r.channels, r.outBuff[:int(outLen)*r.channels], nil
 }
 
 // PocessFloat Resample an float32 slice

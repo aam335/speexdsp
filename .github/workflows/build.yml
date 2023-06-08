@@ -1,0 +1,44 @@
+name: build
+on: [pull_request, push]
+
+jobs:
+  build:
+    strategy:
+      matrix:
+        os: [ubuntu, macos]
+        go: [1.11, 1.x]
+
+    name: ${{ matrix.os }} - go ${{ matrix.go }}
+
+    runs-on: ${{ matrix.os }}-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+
+      - name: Install dependencies
+        run: |
+          case "$OSTYPE" in
+            linux*)
+              sudo apt-get -y install libspeexdsp-dev
+              ;;
+            darwin*)
+              brew install speexdsp
+              ;;
+          esac
+
+      - name: Install Go
+        uses: actions/setup-go@v3
+        with:
+          go-version: ${{ matrix.go }}
+
+      - name: Build
+        run: |
+          go get -v .
+
+      - name: Run tests
+        run: |
+          go test -v -count=1 .
+
+      - name: Run tests with cgocheck
+        run: |
+          GODEBUG=cgocheck=2 go test -v -count=1 .
