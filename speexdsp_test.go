@@ -119,7 +119,7 @@ func TestProcessIntInterleaved(t *testing.T) {
 	fromBase := int(48000)
 	inLen := inLenGen
 	for i := 0.1; i < 2; i += .05 {
-		for _, channels := range []int{stereo} {
+		for _, channels := range []int{mono, stereo} {
 			toBase := int(float64(fromBase) * i)
 			t.Run(fmt.Sprintf("from=%v,to=%v,chans=%v", fromBase, toBase, channels),
 				func(t *testing.T) {
